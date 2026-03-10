@@ -7,13 +7,15 @@ A Chrome extension that blacks out ads instead of blocking them. Ads load normal
 Traditional ad blockers prevent ads from downloading, which triggers anti-adblock scripts on many websites. Ad Blacker takes a different approach:
 
 1. **CSS layer** — Injects a stylesheet at `document_start` using EasyList cosmetic selectors. Matched elements get a black background with hidden children, applied before ads even render.
-2. **JS layer** — After DOM ready, a MutationObserver catches dynamically-inserted ads and marks them. Click any black rectangle to whitelist it and reveal the original content.
+2. **Heuristic detection** — Catches self-hosted ads that EasyList misses by matching common ad-related naming patterns in class/id attributes (e.g. `ad-container`, `holding-ad`, `sponsor`). Short "ad" token patterns use JS word-boundary matching to avoid false positives on words like "lead" or "bread".
+3. **JS layer** — After DOM ready, a MutationObserver catches dynamically-inserted ads and marks them. Click any black rectangle to whitelist it and reveal the original content.
 
 Anti-adblock systems check whether ad scripts loaded and executed — they don't inspect CSS styling, so this approach flies under the radar.
 
 ## Features
 
 - **13,000+ cosmetic filter selectors** from EasyList, with site-specific rules for 7,000+ domains
+- **Heuristic ad detection** — catches self-hosted ads using common naming patterns (`ad-*`, `*-ad`, `sponsor`, `dfp-*`, etc.) with word-boundary–safe matching
 - **Click to whitelist** — click any blacked ad to reveal it and whitelist it permanently for that site
 - **Whitelist management** — manage whitelisted elements per site from the popup
 - **Per-site toggle** — disable Ad Blacker on specific sites via the popup

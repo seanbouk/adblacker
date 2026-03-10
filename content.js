@@ -13,6 +13,51 @@
   const domain = location.hostname;
   const OVERRIDE_PROPS = ['background', 'color', 'border-color', 'text-shadow', 'box-shadow'];
 
+  // CSS-safe heuristic selectors (long enough to avoid false positives via substring matching)
+  const HEURISTIC_SELECTORS = [
+    '[class*="advert"]', '[id*="advert"]',
+    '[class*="adslot"]', '[id*="adslot"]',
+    '[class*="ad-slot"]', '[id*="ad-slot"]',
+    '[class*="ad-unit"]', '[id*="ad-unit"]',
+    '[class*="ad-container"]', '[id*="ad-container"]',
+    '[class*="ad-wrapper"]', '[id*="ad-wrapper"]',
+    '[class*="ad-banner"]', '[id*="ad-banner"]',
+    '[class*="ad-box"]', '[id*="ad-box"]',
+    '[class*="ad-space"]', '[id*="ad-space"]',
+    '[class*="sponsor"]', '[id*="sponsor"]',
+    '[class*="gpt-ad"]', '[id*="gpt-ad"]',
+    '[class*="dfp-"]', '[id*="dfp-"]',
+    '[class*="holding-ad"]',
+    '[class*="advertisement"]', '[id*="advertisement"]',
+  ];
+
+  // JS-only: regex to match "ad" as a token bounded by delimiters (-_) or string edges.
+  // Checked against individual class names / id, NOT the raw attribute string.
+  // This avoids false positives like "image-lead__Ti3qQ" where CSS [class*="ad_"] would match.
+  const AD_TOKEN_RE = /(^|[-_])ad([-_]|$)/i;
+
+  // Broad CSS selector to find candidates for JS token matching
+  const AD_CANDIDATE_SELECTOR = '[class*="ad"], [id*="ad"]';
+
+  function hasAdToken(el) {
+    for (const cls of el.classList) {
+      if (AD_TOKEN_RE.test(cls)) return true;
+    }
+    if (el.id && AD_TOKEN_RE.test(el.id)) return true;
+    return false;
+  }
+
+  const SEMANTIC_TAGS = new Set(['NAV', 'HEADER', 'MAIN', 'ARTICLE', 'FOOTER', 'SECTION']);
+
+  function isLikelyAd(el) {
+    // Skip semantic container tags unlikely to be ads
+    if (SEMANTIC_TAGS.has(el.tagName)) return false;
+    // Skip very small / invisible spacer elements
+    const rect = el.getBoundingClientRect();
+    if (rect.width < 10 || rect.height < 10) return false;
+    return true;
+  }
+
   function overrideBlacking(el) {
     OVERRIDE_PROPS.forEach(prop => el.style.setProperty(prop, 'initial', 'important'));
     el.querySelectorAll('*').forEach(child => {
@@ -39,12 +84,10 @@
     const response = await chrome.runtime.sendMessage({ type: 'GET_FILTERS', domain });
     selectors = response.selectors || [];
 
-    if (selectors.length === 0) return;
-
     // Build selector set for JS matching
     selectorSet = new Set(selectors);
 
-    // Inject CSS layer (instant blacking)
+    // Inject CSS layer (instant blacking — includes heuristic selectors)
     injectBlackingCSS();
 
     // When DOM is ready, apply JS layer
@@ -77,6 +120,20 @@ ${childGroup} {
   visibility: hidden !important;
 }`);
     }
+
+    // Add heuristic selectors as an additional CSS chunk
+    const heuristicGroup = HEURISTIC_SELECTORS.join(',\n');
+    const heuristicChildGroup = HEURISTIC_SELECTORS.map(s => s + ' *').join(',\n');
+    chunks.push(`${heuristicGroup} {
+  background: #000 !important;
+  color: transparent !important;
+  border-color: transparent !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+${heuristicChildGroup} {
+  visibility: hidden !important;
+}`);
 
     styleEl.textContent = chunks.join('\n');
 
@@ -123,6 +180,35 @@ ${childGroup} {
         // Invalid selector — skip silently
       }
     }
+
+    // Apply CSS-safe heuristic selectors with size/tag filtering
+    for (const selector of HEURISTIC_SELECTORS) {
+      try {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          if (isWhitelisted(el)) continue;
+          if (!isLikelyAd(el)) {
+            overrideBlacking(el);
+            continue;
+          }
+          markElement(el);
+        }
+      } catch (e) {
+        // Invalid selector — skip silently
+      }
+    }
+
+    // JS-only: match "ad" as a token in individual class names / id
+    try {
+      const candidates = document.querySelectorAll(AD_CANDIDATE_SELECTOR);
+      for (const el of candidates) {
+        if (el.classList.contains('adblacker-hidden')) continue;
+        if (isWhitelisted(el)) continue;
+        if (!hasAdToken(el)) continue;
+        if (!isLikelyAd(el)) continue;
+        markElement(el);
+      }
+    } catch (e) { /* skip */ }
 
     // Override injected CSS for whitelisted elements
     for (const sel of whitelistedSelectors) {
@@ -209,6 +295,58 @@ ${childGroup} {
             }
           }
         } catch (e) { /* invalid selector */ }
+      }
+
+      // CSS-safe heuristic: check the node itself
+      for (const selector of HEURISTIC_SELECTORS) {
+        try {
+          if (node.matches && node.matches(selector) && !isWhitelisted(node)) {
+            if (isLikelyAd(node)) {
+              markElement(node);
+              newAds++;
+            } else {
+              overrideBlacking(node);
+            }
+            break;
+          }
+        } catch (e) { /* invalid selector */ }
+      }
+
+      // CSS-safe heuristic: check descendants
+      for (const selector of HEURISTIC_SELECTORS) {
+        try {
+          const matches = node.querySelectorAll ? node.querySelectorAll(selector) : [];
+          for (const el of matches) {
+            if (isWhitelisted(el)) continue;
+            if (isLikelyAd(el)) {
+              markElement(el);
+              newAds++;
+            } else {
+              overrideBlacking(el);
+            }
+          }
+        } catch (e) { /* invalid selector */ }
+      }
+
+      // JS-only token matching: check node and descendants
+      if (node.matches && node.matches(AD_CANDIDATE_SELECTOR) && hasAdToken(node)) {
+        if (!isWhitelisted(node) && isLikelyAd(node)) {
+          markElement(node);
+          newAds++;
+        }
+      }
+      if (node.querySelectorAll) {
+        try {
+          const candidates = node.querySelectorAll(AD_CANDIDATE_SELECTOR);
+          for (const el of candidates) {
+            if (el.classList.contains('adblacker-hidden')) continue;
+            if (!hasAdToken(el)) continue;
+            if (isWhitelisted(el)) continue;
+            if (!isLikelyAd(el)) continue;
+            markElement(el);
+            newAds++;
+          }
+        } catch (e) { /* skip */ }
       }
     }
 
