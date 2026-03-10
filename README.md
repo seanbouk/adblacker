@@ -6,16 +6,16 @@ A Chrome extension that blacks out ads instead of blocking them. Ads load normal
 
 Traditional ad blockers prevent ads from downloading, which triggers anti-adblock scripts on many websites. Ad Blacker takes a different approach:
 
-1. **CSS layer** — Injects a stylesheet at `document_start` using EasyList cosmetic selectors. Matched elements get a `::before` pseudo-element overlay in solid black, applied before ads even render.
-2. **JS layer** — After DOM ready, a MutationObserver catches dynamically-inserted ads and marks them. Click any black rectangle to reveal the original content.
+1. **CSS layer** — Injects a stylesheet at `document_start` using EasyList cosmetic selectors. Matched elements get a black background with hidden children, applied before ads even render.
+2. **JS layer** — After DOM ready, a MutationObserver catches dynamically-inserted ads and marks them. Click any black rectangle to whitelist it and reveal the original content.
 
 Anti-adblock systems check whether ad scripts loaded and executed — they don't inspect CSS styling, so this approach flies under the radar.
 
 ## Features
 
 - **13,000+ cosmetic filter selectors** from EasyList, with site-specific rules for 7,000+ domains
-- **Click to reveal** — click any blacked ad to see it, with Re-black and Always Show buttons
-- **Per-element whitelist** — "Always show" remembers your choice per domain across sessions
+- **Click to whitelist** — click any blacked ad to reveal it and whitelist it permanently for that site
+- **Whitelist management** — manage whitelisted elements per site from the popup
 - **Per-site toggle** — disable Ad Blacker on specific sites via the popup
 - **Global toggle** — turn everything on/off instantly
 - **Auto-updating filters** — weekly background refresh from EasyList
@@ -37,8 +37,8 @@ Anti-adblock systems check whether ad scripts loaded and executed — they don't
 ```
 manifest.json              MV3 extension config
 background.js              Service worker: filters, whitelist, settings, badge
-content.js                 Core: CSS injection, MutationObserver, click-to-reveal
-content.css                Overlay and toolbar styles
+content.js                 Core: CSS injection, MutationObserver, click-to-whitelist
+content.css                Overlay styles
 popup/
   popup.html/css/js        Extension popup UI
 filters/

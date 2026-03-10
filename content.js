@@ -11,6 +11,14 @@
   let styleEl = null;
 
   const domain = location.hostname;
+  const OVERRIDE_PROPS = ['background', 'color', 'border-color', 'text-shadow', 'box-shadow'];
+
+  function overrideBlacking(el) {
+    OVERRIDE_PROPS.forEach(prop => el.style.setProperty(prop, 'initial', 'important'));
+    el.querySelectorAll('*').forEach(child => {
+      child.style.setProperty('visibility', 'visible', 'important');
+    });
+  }
 
   // Initialize
   init();
@@ -115,10 +123,20 @@ ${childGroup} {
         // Invalid selector — skip silently
       }
     }
+
+    // Override injected CSS for whitelisted elements
+    for (const sel of whitelistedSelectors) {
+      try {
+        const elements = document.querySelectorAll(sel);
+        for (const el of elements) {
+          overrideBlacking(el);
+        }
+      } catch (e) { /* invalid selector */ }
+    }
   }
 
   function markElement(el) {
-    if (el.classList.contains('adblacker-hidden') || el.classList.contains('adblacker-revealed')) return;
+    if (el.classList.contains('adblacker-hidden')) return;
     el.classList.add('adblacker-hidden');
     el.dataset.adblacker = 'true';
     adCount++;
@@ -199,69 +217,30 @@ ${childGroup} {
     }
   }
 
-  // Click-to-reveal
+  // Click-to-reveal: immediately whitelist and reveal
   function setupClickToReveal() {
     document.addEventListener('click', (e) => {
       if (!enabled) return;
 
-      // Check if clicked element or ancestor is an adblacker-hidden element
       const adEl = e.target.closest('.adblacker-hidden');
       if (!adEl) return;
 
       e.preventDefault();
       e.stopPropagation();
-      revealElement(adEl);
-    }, true); // Capture phase
-  }
 
-  function revealElement(el) {
-    el.classList.remove('adblacker-hidden');
-    el.classList.add('adblacker-revealed');
-
-    // Remove existing toolbar if any
-    const existing = el.querySelector('.adblacker-toolbar');
-    if (existing) existing.remove();
-
-    // Create toolbar
-    const toolbar = document.createElement('div');
-    toolbar.className = 'adblacker-toolbar';
-
-    const reblackBtn = document.createElement('button');
-    reblackBtn.className = 'adblacker-btn-reblack';
-    reblackBtn.textContent = '\u2715 Re-black';
-    reblackBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      toolbar.remove();
-      el.classList.remove('adblacker-revealed');
-      el.classList.add('adblacker-hidden');
-    });
-
-    const whitelistBtn = document.createElement('button');
-    whitelistBtn.className = 'adblacker-btn-whitelist';
-    whitelistBtn.textContent = '\u2713 Always show';
-    whitelistBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const fingerprint = getElementFingerprint(el);
+      // Whitelist this element
+      const fingerprint = getElementFingerprint(adEl);
       if (fingerprint) {
-        chrome.runtime.sendMessage({
-          type: 'WHITELIST_ADD',
-          domain,
-          selector: fingerprint
-        });
+        chrome.runtime.sendMessage({ type: 'WHITELIST_ADD', domain, selector: fingerprint });
         whitelistedSelectors.push(fingerprint);
       }
-      toolbar.remove();
-      el.classList.remove('adblacker-revealed');
+
+      // Reveal it
+      adEl.classList.remove('adblacker-hidden');
+      overrideBlacking(adEl);
       adCount--;
       updateBadge();
-    });
-
-    toolbar.appendChild(reblackBtn);
-    toolbar.appendChild(whitelistBtn);
-
-    el.appendChild(toolbar);
+    }, true);
   }
 
   // Build a CSS selector fingerprint for an element
@@ -298,7 +277,7 @@ ${childGroup} {
         const siblings = Array.from(parent.children).filter(s => s.tagName === current.tagName);
         if (siblings.length > 1) {
           const idx = siblings.indexOf(current) + 1;
-          part += ':nth-child(' + idx + ')';
+          part += ':nth-of-type(' + idx + ')';
         }
       }
 
