@@ -57,21 +57,16 @@
       const chunk = selectors.slice(i, i + 1000);
       // Wrap each chunk in a rule — if a selector is invalid, only that chunk breaks
       const selectorGroup = chunk.join(',\n');
+      const childGroup = chunk.map(s => s + ' *').join(',\n');
       chunks.push(`${selectorGroup} {
-  position: relative !important;
-  overflow: hidden !important;
-}
-${selectorGroup}::before {
-  content: '' !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
   background: #000 !important;
-  z-index: 2147483647 !important;
-  pointer-events: none !important;
-  display: block !important;
+  color: transparent !important;
+  border-color: transparent !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+${childGroup} {
+  visibility: hidden !important;
 }`);
     }
 
@@ -265,12 +260,6 @@ ${selectorGroup}::before {
 
     toolbar.appendChild(reblackBtn);
     toolbar.appendChild(whitelistBtn);
-
-    // Ensure parent has relative positioning for toolbar
-    const pos = getComputedStyle(el).position;
-    if (pos === 'static') {
-      el.style.position = 'relative';
-    }
 
     el.appendChild(toolbar);
   }

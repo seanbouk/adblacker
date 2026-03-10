@@ -1,42 +1,39 @@
 /* Ad Blacker — Overlay Styles */
 
 .adblacker-hidden {
-  position: relative !important;
-  overflow: hidden !important;
+  background: #000 !important;
+  color: transparent !important;
+  border-color: transparent !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
 }
 
-.adblacker-hidden::before {
-  content: '' !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  background: #000 !important;
-  z-index: 2147483647 !important;
-  pointer-events: none !important;
-  display: block !important;
+.adblacker-hidden * {
+  visibility: hidden !important;
 }
 
 /* Revealed state */
 .adblacker-revealed {
   outline: 2px solid #333 !important;
+  background: revert !important;
+  color: revert !important;
+  border-color: revert !important;
+  text-shadow: revert !important;
+  box-shadow: revert !important;
 }
 
-.adblacker-revealed::before {
-  display: none !important;
+.adblacker-revealed * {
+  visibility: visible !important;
 }
 
 /* Toolbar shown on reveal */
 .adblacker-toolbar {
-  position: absolute !important;
-  top: 4px !important;
-  right: 4px !important;
-  z-index: 2147483647 !important;
-  display: flex !important;
+  display: inline-flex !important;
   gap: 4px !important;
+  padding: 4px !important;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
   font-size: 12px !important;
+  visibility: visible !important;
 }
 
 .adblacker-toolbar button {
