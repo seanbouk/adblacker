@@ -1,12 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Ad Blacker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Blacks out ads with solid rectangles instead of blocking them, avoiding anti-adblock detection.",
   "permissions": [
     "storage",
-    "activeTab",
-    "scripting",
     "alarms"
   ],
   "host_permissions": [
